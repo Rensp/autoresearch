@@ -1,46 +1,46 @@
 # autoresearch
 
-This is an experiment to have the LLM do its own research.
+Dit is een experiment waarbij de LLM zijn eigen onderzoek uitvoert.
 
 ## Setup
 
-To set up a new experiment, work with the user to:
+Om een nieuw experiment op te zetten, werk je samen met de gebruiker om:
 
-1. **Agree on a run tag**: propose a tag based on today's date (e.g. `mar5`). The branch `autoresearch/<tag>` must not already exist — this is a fresh run.
-2. **Create the branch**: `git checkout -b autoresearch/<tag>` from current master.
-3. **Read the in-scope files**: The repo is small. Read these files for full context:
-   - `README.md` — repository context.
-   - `prepare.py` — fixed constants, data prep, tokenizer, dataloader, evaluation. Do not modify.
-   - `train.py` — the file you modify. Model architecture, optimizer, training loop.
-4. **Verify data exists**: Check that `~/.cache/autoresearch/` contains data shards and a tokenizer. If not, tell the human to run `uv run prepare.py`.
-5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
-6. **Confirm and go**: Confirm setup looks good.
+1. **Een runtag af te spreken**: stel een tag voor op basis van de datum van vandaag (bijv. `mar5`). De branch `autoresearch/<tag>` mag nog niet bestaan — dit is een nieuwe run.
+2. **De branch aan te maken**: `git checkout -b autoresearch/<tag>` vanuit de huidige master.
+3. **De relevante bestanden te lezen**: De repository is klein. Lees deze bestanden voor volledige context:
+   - `README.md` — context van de repository.
+   - `prepare.py` — vaste constanten, datavoorbereiding, tokenizer, dataloader, evaluatie. Niet aanpassen.
+   - `train.py` — het bestand dat je aanpast. Modelarchitectuur, optimizer, trainlus.
+4. **Controleer of data aanwezig is**: Controleer of `~/.cache/autoresearch/` datashards en een tokenizer bevat. Zo niet, vertel de gebruiker dat hij `uv run prepare.py` moet uitvoeren.
+5. **results.tsv initialiseren**: Maak `results.tsv` aan met alleen de koptekstrij. De baseline wordt vastgelegd na de eerste run.
+6. **Bevestig en start**: Bevestig dat de setup er goed uitziet.
 
-Once you get confirmation, kick off the experimentation.
+Zodra je bevestiging krijgt, start je met de experimenten.
 
-## Experimentation
+## Experimenteren
 
-Each experiment runs on a single GPU. The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `uv run train.py`.
+Elk experiment wordt uitgevoerd op één GPU. Het trainscript draait gedurende een **vast tijdbudget van 5 minuten** (wandkloktijd voor training, exclusief opstarten/compileren). Je start het eenvoudig met: `uv run train.py`.
 
-**What you CAN do:**
-- Modify `train.py` — this is the only file you edit. Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
+**Wat je WEL mag doen:**
+- `train.py` aanpassen — dit is het enige bestand dat je bewerkt. Alles is toegestaan: modelarchitectuur, optimizer, hyperparameters, trainlus, batchgrootte, modelgrootte, enzovoort.
 
-**What you CANNOT do:**
-- Modify `prepare.py`. It is read-only. It contains the fixed evaluation, data loading, tokenizer, and training constants (time budget, sequence length, etc).
-- Install new packages or add dependencies. You can only use what's already in `pyproject.toml`.
-- Modify the evaluation harness. The `evaluate_bpb` function in `prepare.py` is the ground truth metric.
+**Wat je NIET mag doen:**
+- `prepare.py` aanpassen. Dit bestand is alleen-lezen. Het bevat de vaste evaluatie, het laden van data, de tokenizer en de trainingsconstanten (tijdbudget, sequentielengte, enz.).
+- Nieuwe pakketten installeren of afhankelijkheden toevoegen. Je kunt alleen gebruikmaken van wat al in `pyproject.toml` staat.
+- De evaluatieharnas aanpassen. De functie `evaluate_bpb` in `prepare.py` is de grondwaarheidmetriek.
 
-**The goal is simple: get the lowest val_bpb.** Since the time budget is fixed, you don't need to worry about training time — it's always 5 minutes. Everything is fair game: change the architecture, the optimizer, the hyperparameters, the batch size, the model size. The only constraint is that the code runs without crashing and finishes within the time budget.
+**Het doel is simpel: behaal de laagste val_bpb.** Omdat het tijdbudget vast staat, hoef je je geen zorgen te maken over trainingstijd — het is altijd 5 minuten. Alles is toegestaan: verander de architectuur, de optimizer, de hyperparameters, de batchgrootte, de modelgrootte. De enige beperking is dat de code zonder crashes draait en binnen het tijdbudget klaar is.
 
-**VRAM** is a soft constraint. Some increase is acceptable for meaningful val_bpb gains, but it should not blow up dramatically.
+**VRAM** is een zachte beperking. Een beperkte toename is aanvaardbaar bij betekenisvolle val_bpb-winst, maar het mag niet dramatisch stijgen.
 
-**Simplicity criterion**: All else being equal, simpler is better. A small improvement that adds ugly complexity is not worth it. Conversely, removing something and getting equal or better results is a great outcome — that's a simplification win. When evaluating whether to keep a change, weigh the complexity cost against the improvement magnitude. A 0.001 val_bpb improvement that adds 20 lines of hacky code? Probably not worth it. A 0.001 val_bpb improvement from deleting code? Definitely keep. An improvement of ~0 but much simpler code? Keep.
+**Eenvoudigheidscriterium**: Als alles gelijk is, is eenvoudiger beter. Een kleine verbetering die lelijke complexiteit toevoegt is het niet waard. Omgekeerd: iets verwijderen en gelijke of betere resultaten behalen is een geweldige uitkomst — dat is een vereenvoudigingswinst. Weeg bij het beoordelen of een wijziging behouden moet worden de complexiteitskosten af tegen de verbetering. Een verbetering van 0.001 val_bpb die 20 regels rommelige code toevoegt? Waarschijnlijk niet de moeite waard. Een verbetering van 0.001 val_bpb door code te verwijderen? Absoluut bewaren. Een verbetering van ~0 maar veel eenvoudigere code? Bewaren.
 
-**The first run**: Your very first run should always be to establish the baseline, so you will run the training script as is.
+**De eerste run**: Je allereerste run is altijd om de baseline vast te stellen, dus je voert het trainscript ongewijzigd uit.
 
-## Output format
+## Uitvoerformaat
 
-Once the script finishes it prints a summary like this:
+Zodra het script klaar is, toont het een samenvatting zoals dit:
 
 ```
 ---
@@ -55,60 +55,60 @@ num_params_M:     50.3
 depth:            8
 ```
 
-Note that the script is configured to always stop after 5 minutes, so depending on the computing platform of this computer the numbers might look different. You can extract the key metric from the log file:
+Let op: het script is geconfigureerd om altijd na 5 minuten te stoppen, dus afhankelijk van het rekenplatform kunnen de getallen er anders uitzien. Je kunt de kernmetriek uit het logbestand halen met:
 
 ```
 grep "^val_bpb:" run.log
 ```
 
-## Logging results
+## Resultaten vastleggen
 
-When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-separated — commas break in descriptions).
+Wanneer een experiment klaar is, log je het in `results.tsv` (tab-gescheiden, NIET komma-gescheiden — komma's breken in beschrijvingen).
 
-The TSV has a header row and 5 columns:
+Het TSV-bestand heeft een koptekstrij en 5 kolommen:
 
 ```
 commit	val_bpb	memory_gb	status	description
 ```
 
-1. git commit hash (short, 7 chars)
-2. val_bpb achieved (e.g. 1.234567) — use 0.000000 for crashes
-3. peak memory in GB, round to .1f (e.g. 12.3 — divide peak_vram_mb by 1024) — use 0.0 for crashes
-4. status: `keep`, `discard`, or `crash`
-5. short text description of what this experiment tried
+1. git commit hash (kort, 7 tekens)
+2. behaalde val_bpb (bijv. 1.234567) — gebruik 0.000000 bij crashes
+3. piekgeheugen in GB, afgerond op .1f (bijv. 12.3 — deel peak_vram_mb door 1024) — gebruik 0.0 bij crashes
+4. status: `keep`, `discard`, of `crash`
+5. korte tekstbeschrijving van wat dit experiment probeerde
 
-Example:
+Voorbeeld:
 
 ```
 commit	val_bpb	memory_gb	status	description
 a1b2c3d	0.997900	44.0	keep	baseline
-b2c3d4e	0.993200	44.2	keep	increase LR to 0.04
-c3d4e5f	1.005000	44.0	discard	switch to GeLU activation
-d4e5f6g	0.000000	0.0	crash	double model width (OOM)
+b2c3d4e	0.993200	44.2	keep	LR verhoogd naar 0.04
+c3d4e5f	1.005000	44.0	discard	overgestapt op GeLU activatie
+d4e5f6g	0.000000	0.0	crash	modelbreedte verdubbeld (OOM)
 ```
 
-## The experiment loop
+## De experimentlus
 
-The experiment runs on a dedicated branch (e.g. `autoresearch/mar5` or `autoresearch/mar5-gpu0`).
+Het experiment draait op een toegewijde branch (bijv. `autoresearch/mar5` of `autoresearch/mar5-gpu0`).
 
-LOOP FOREVER:
+HERHAAL VOOR ALTIJD:
 
-1. Look at the git state: the current branch/commit we're on
-2. Tune `train.py` with an experimental idea by directly hacking the code.
+1. Bekijk de git-status: de huidige branch/commit waar je op staat
+2. Pas `train.py` aan met een experimenteel idee door de code direct te bewerken.
 3. git commit
-4. Run the experiment: `uv run train.py > run.log 2>&1` (redirect everything — do NOT use tee or let output flood your context)
-5. Read out the results: `grep "^val_bpb:\|^peak_vram_mb:" run.log`
-6. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the Python stack trace and attempt a fix. If you can't get things to work after more than a few attempts, give up.
-7. Record the results in the tsv (NOTE: do not commit the results.tsv file, leave it untracked by git)
-8. If val_bpb improved (lower), you "advance" the branch, keeping the git commit
-9. If val_bpb is equal or worse, you git reset back to where you started
+4. Voer het experiment uit: `uv run train.py > run.log 2>&1` (leid alles om — gebruik GEEN tee en laat uitvoer je context niet overspoelen)
+5. Lees de resultaten: `grep "^val_bpb:\|^peak_vram_mb:" run.log`
+6. Als de grep-uitvoer leeg is, is de run gecrasht. Voer `tail -n 50 run.log` uit om de Python-stacktracering te lezen en probeer een oplossing. Als het niet lukt na een paar pogingen, geef dan op.
+7. Leg de resultaten vast in het tsv-bestand (LET OP: commit het bestand results.tsv niet, laat het ongetrackt door git)
+8. Als val_bpb verbeterd is (lager), "verander" je de branch en behoudt je de git commit
+9. Als val_bpb gelijk of slechter is, voer je git reset uit naar waar je begon
 
-The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate. If you feel like you're getting stuck in some way, you can rewind but you should probably do this very very sparingly (if ever).
+Het idee is dat je een volledig autonome onderzoeker bent die dingen uitprobeert. Werkt het? Bewaren. Werkt het niet? Weggooien. En je gaat de branch vooruit zodat je kunt itereren. Als je het gevoel hebt dat je ergens vastloopt, kun je terugspoelen, maar doe dit heel spaarzaam (zo zelden mogelijk of nooit).
 
-**Timeout**: Each experiment should take ~5 minutes total (+ a few seconds for startup and eval overhead). If a run exceeds 10 minutes, kill it and treat it as a failure (discard and revert).
+**Time-out**: Elk experiment duurt ~5 minuten in totaal (+ een paar seconden voor opstarten en evaluatie-overhead). Als een run langer dan 10 minuten duurt, beëindig je hem en behandel je hem als een mislukking (weggooien en terugdraaien).
 
-**Crashes**: If a run crashes (OOM, or a bug, or etc.), use your judgment: If it's something dumb and easy to fix (e.g. a typo, a missing import), fix it and re-run. If the idea itself is fundamentally broken, just skip it, log "crash" as the status in the tsv, and move on.
+**Crashes**: Als een run crasht (OOM, of een bug, enz.), gebruik dan je oordeel: Als het iets kleins en makkelijk op te lossen is (bijv. een typefout, een ontbrekende import), fix het en start opnieuw. Als het idee zelf fundamenteel gebrekkig is, sla het dan gewoon over, log "crash" als status in de tsv, en ga verder.
 
-**NEVER STOP**: Once the experiment loop has begun (after the initial setup), do NOT pause to ask the human if you should continue. Do NOT ask "should I keep going?" or "is this a good stopping point?". The human might be asleep, or gone from a computer and expects you to continue working *indefinitely* until you are manually stopped. You are autonomous. If you run out of ideas, think harder — read papers referenced in the code, re-read the in-scope files for new angles, try combining previous near-misses, try more radical architectural changes. The loop runs until the human interrupts you, period.
+**STOP NOOIT**: Zodra de experimentlus is begonnen (na de initiële setup), PAUZEER je NIET om de gebruiker te vragen of je door moet gaan. Vraag NIET "zal ik doorgaan?" of "is dit een goed moment om te stoppen?". De gebruiker slaapt misschien, of is weg van zijn computer en verwacht dat je *onbeperkt* door blijft werken totdat je handmatig gestopt wordt. Je bent autonoom. Als je geen ideeën meer hebt, denk harder na — lees papers waarnaar in de code wordt verwezen, herlees de relevante bestanden voor nieuwe invalshoeken, probeer eerdere bijna-successen te combineren, probeer radicalere architecturale veranderingen. De lus draait totdat de gebruiker je onderbreekt, punt.
 
-As an example use case, a user might leave you running while they sleep. If each experiment takes you ~5 minutes then you can run approx 12/hour, for a total of about 100 over the duration of the average human sleep. The user then wakes up to experimental results, all completed by you while they slept!
+Als gebruiksscenario kan een gebruiker je laten draaien terwijl hij slaapt. Als elk experiment ~5 minuten duurt, kun je ongeveer 12 per uur draaien, voor een totaal van ongeveer 100 gedurende een gemiddelde menselijke slaap. De gebruiker wordt dan wakker met experimentresultaten, allemaal voltooid door jou terwijl hij sliep!
