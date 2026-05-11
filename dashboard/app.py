@@ -285,9 +285,20 @@ def live_section():
         )
         st.plotly_chart(fig, width="stretch")
 
-    # ── RIGHT: Calculator ─────────────────────────────────────────────────────
+    # ── RIGHT: Calculator + AI ───────────────────────────────────────────────
     with right:
         render_calculator(display_price)
+        st.divider()
+        signal = st.session_state.get("_ai_signal")
+        render_ai_analysis(
+            dax_price=display_price,
+            signal_score=signal.score if signal else 0.0,
+            signal_label=signal.label if signal else "NEUTRAL",
+            signal_components=signal.components if signal else {},
+            day_stats=day_stats or {},
+            news_headlines=[],
+            calendar_events=[],
+        )
 
 
 # ── Bottom tabs: News / AI ───────────────────────────────────────────────────
