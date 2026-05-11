@@ -190,7 +190,7 @@ def live_section():
     # ── Header: live prijs + vernieuwen knop ─────────────────────────────────
     header_left, header_right = st.columns([5, 1])
     with header_right:
-        if st.button("🔄 Vernieuwen", use_container_width=True):
+        if st.button("🔄 Vernieuwen", width="stretch"):
             st.cache_data.clear()
             st.rerun()
 
@@ -273,7 +273,7 @@ def live_section():
             show_ema=show_ema,
             show_bb=show_bb,
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # ── RIGHT: Calculator ─────────────────────────────────────────────────────
     with right:

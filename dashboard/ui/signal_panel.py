@@ -81,7 +81,7 @@ def render_score_gauge(score: float) -> None:
         height=200,
         margin=dict(l=20, r=20, t=20, b=10),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def _score_color(score: float) -> str:
@@ -109,7 +109,7 @@ def render_signal_breakdown(result: SignalResult) -> None:
             "Signaal": direction,
         })
     df = pd.DataFrame(rows)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
 
 def render_mtf_confluence(mtf_results: dict) -> None:

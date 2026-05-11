@@ -123,11 +123,23 @@ def stop_feed() -> None:
     _stop_event.set()
 
 
+class CredentialsError(Exception):
+    """Raised when DEGIRO rejects username/password. Do not retry."""
+    pass
+
+
 def _run_feed(username: str, password: str, extra_isins: list[str]) -> None:
     """Main background thread: login → search products → stream prices."""
     while not _stop_event.is_set():
         try:
             _stream(username, password, extra_isins)
+        except CredentialsError as exc:
+            # Wrong password — stop retrying to avoid account lockout
+            with _lock:
+                _state["connected"] = False
+                _state["error"] = str(exc)
+            logger.error("DEGIRO credentials error (not retrying): %s", exc)
+            return  # Exit thread permanently
         except Exception as exc:
             with _lock:
                 _state["connected"] = False
@@ -157,14 +169,21 @@ def _stream(username: str, password: str, extra_isins: list[str]) -> None:
             session=session,
         )
     except Exception as exc:
+        err_str = str(exc)
+        if "badCredentials" in err_str or "bad_credentials" in err_str.lower():
+            msg = "❌ Verkeerde gebruikersnaam of wachtwoord. Pas je .env aan en herstart de app."
+            with _lock:
+                _state["error"] = msg
+            raise CredentialsError(msg) from exc
         with _lock:
             _state["error"] = f"Login mislukt: {exc}"
         raise
 
     if not trading_session_id:
+        msg = "❌ Verkeerde gebruikersnaam of wachtwoord. Pas je .env aan en herstart de app."
         with _lock:
-            _state["error"] = "Login mislukt — controleer gebruikersnaam en wachtwoord."
-        raise ConnectionError("Login failed")
+            _state["error"] = msg
+        raise CredentialsError(msg)
 
     # ── Step 2: Get user_token (int) for quotecast ────────────────────────────
     client_details = ActionGetClientDetails.get_client_details(

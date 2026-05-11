@@ -14,14 +14,16 @@ _RISK_COLORS = {
 def render_calculator(current_dax: float | None) -> None:
     st.markdown("### 🧮 Turbo Calculator")
 
-    dax_default = float(current_dax) if current_dax else 18000.0
+    # Sanity check: DAX is always between 5000 and 60000 in any realistic scenario
+    _raw = float(current_dax) if current_dax else 0.0
+    dax_default = _raw if 5000.0 < _raw < 60000.0 else 18000.0
 
     # Quick-fill for known turbos
     with st.expander("⚡ Snel invullen — jouw BNP Turbo Short", expanded=True):
         st.markdown(
             "**BNP | DE000BB3S888** — SHORT | STR 25827.2556 | SL 25568.9830 | Ratio 1:500"
         )
-        if st.button("Vul mijn turbo in", type="secondary", use_container_width=True):
+        if st.button("Vul mijn turbo in", type="secondary", width="stretch"):
             st.session_state["turbo_prefill"] = {
                 "type": "SHORT",
                 "financing": 25827.2556,
@@ -91,7 +93,7 @@ def render_calculator(current_dax: float | None) -> None:
                 value=2.0, step=0.5, format="%.1f%%"
             )
 
-        submitted = st.form_submit_button("Berekenen", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("Berekenen", type="primary", width="stretch")
 
     if submitted:
         _validate_and_show(
@@ -182,4 +184,4 @@ def _validate_and_show(
 
     # Highlight the zero-move row
     zero_idx = df[df["DAX move"] == "+0%"].index
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
