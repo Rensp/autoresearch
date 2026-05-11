@@ -16,30 +16,48 @@ def render_calculator(current_dax: float | None) -> None:
 
     dax_default = float(current_dax) if current_dax else 18000.0
 
+    # Quick-fill for known turbos
+    with st.expander("⚡ Snel invullen — jouw BNP Turbo Short", expanded=True):
+        st.markdown(
+            "**BNP | DE000BB3S888** — SHORT | STR 25827.2556 | SL 25568.9830 | Ratio 1:500"
+        )
+        if st.button("Vul mijn turbo in", type="secondary", use_container_width=True):
+            st.session_state["turbo_prefill"] = {
+                "type": "SHORT",
+                "financing": 25827.2556,
+                "knockout": 25568.9830,
+                "ratio_divisor": 500,
+            }
+
+    prefill = st.session_state.get("turbo_prefill", {})
+
     with st.form("turbo_form"):
         turbo_type = st.radio(
             "Turbo type", ["LONG", "SHORT"], horizontal=True,
+            index=1 if prefill.get("type") == "SHORT" else 0,
             help="LONG = profiteer van stijgende DAX. SHORT = profiteer van dalende DAX."
         )
 
         col1, col2 = st.columns(2)
         with col1:
             financing = st.number_input(
-                "Financieringsniveau (€)",
+                "Strike / Financieringsniveau (STR)",
                 min_value=1000.0,
-                max_value=float(dax_default * 1.5),
-                value=round(dax_default * 0.90, 0) if turbo_type == "LONG" else round(dax_default * 1.10, 0),
-                step=50.0,
-                help="Strike/financieringsniveau van de turbo (opgegeven door uitgever).",
+                max_value=float(dax_default * 2.0),
+                value=float(prefill.get("financing", round(dax_default * 1.10, 0) if turbo_type == "SHORT" else round(dax_default * 0.90, 0))),
+                step=0.0001,
+                format="%.4f",
+                help="Het 'STR' getal op het productblad van je turbo.",
             )
         with col2:
             knockout = st.number_input(
-                "Knock-out niveau (€)",
+                "Stop Loss / Knock-out niveau (SL)",
                 min_value=1000.0,
-                max_value=float(dax_default * 1.5),
-                value=round(dax_default * 0.92, 0) if turbo_type == "LONG" else round(dax_default * 1.08, 0),
-                step=50.0,
-                help="Als de DAX dit niveau raakt, vervalt de turbo waardeloos.",
+                max_value=float(dax_default * 2.0),
+                value=float(prefill.get("knockout", round(dax_default * 1.08, 0) if turbo_type == "SHORT" else round(dax_default * 0.92, 0))),
+                step=0.0001,
+                format="%.4f",
+                help="Het 'SL' getal op het productblad. Als DAX dit niveau bereikt vervalt de turbo.",
             )
 
         col3, col4 = st.columns(2)
@@ -49,13 +67,17 @@ def render_calculator(current_dax: float | None) -> None:
                 value=1000.0, step=100.0
             )
         with col4:
-            ratio = st.selectbox(
-                "Ratio (turbo per DAX punt)",
-                options=[0.01, 0.001, 0.1],
-                index=0,
-                help="0.01 = meest gangbaar (bijv. BNP Paribas, SocGen). 0.001 = mini turbos.",
-                format_func=lambda x: f"{x} ({1/x:.0f}:1)",
+            # Ratio displayed as divisor (e.g. 500 means 1:500 = multiplier 0.002)
+            _RATIO_OPTIONS = [100, 500, 1000, 10, 200]
+            _default_ratio_idx = _RATIO_OPTIONS.index(prefill.get("ratio_divisor", 100)) if prefill.get("ratio_divisor") in _RATIO_OPTIONS else 0
+            ratio_divisor = st.selectbox(
+                "Ratio (zoals op productblad)",
+                options=_RATIO_OPTIONS,
+                index=_default_ratio_idx,
+                format_func=lambda x: f"1:{x}  (= {1/x:.4f} per cert)",
+                help="BNP Turbo Short met 'R 500' = kies 1:500. De meest gangbare voor mini-turbos.",
             )
+            ratio = 1.0 / ratio_divisor
 
         st.markdown("**Positiegrootteberekening**")
         col5, col6 = st.columns(2)

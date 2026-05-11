@@ -8,7 +8,7 @@ import streamlit as st
 import time
 from datetime import datetime
 
-from dashboard.data.market import fetch_dax_ohlcv, get_dax_day_stats
+from dashboard.data.market import fetch_dax_ohlcv, get_dax_day_stats, get_current_dax_price
 from dashboard.data.news import fetch_news_items, get_upcoming_events
 from dashboard.indicators.signals import compute_signal, compute_mtf_signals, check_confluence
 from dashboard.ui.chart import build_candlestick_chart
@@ -21,7 +21,7 @@ from dashboard.ui.signal_panel import (
 from dashboard.ui.calculator_panel import render_calculator
 from dashboard.ui.news_panel import render_news_feed, render_economic_calendar
 
-REFRESH_SECONDS = 60
+REFRESH_SECONDS = 15  # 15 seconden voor live prijs; grafiek/signalen via 60s cache
 TIMEFRAMES = ["15m", "1h", "4h", "1d"]
 
 st.set_page_config(
@@ -114,6 +114,12 @@ def _cached_day_stats():
     return get_dax_day_stats()
 
 
+# Live prijs: TTL 10s — meest actuele beschikbare data
+@st.cache_data(ttl=10, show_spinner=False)
+def _cached_live_price():
+    return get_current_dax_price()
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def _cached_news():
     return fetch_news_items(max_per_feed=5)
@@ -124,38 +130,69 @@ def _cached_calendar():
     return get_upcoming_events(days_ahead=7)
 
 
-# ── Live data fragment (auto-refreshes independently) ────────────────────────
+# ── Live data fragment (auto-refreshes every REFRESH_SECONDS) ────────────────
 @st.fragment(run_every=REFRESH_SECONDS if auto_refresh else None)
 def live_section():
-    df = _cached_fetch(timeframe)
+    # Snelste beschikbare prijs (10s cache, meerdere bronnen)
+    live_price, price_source = _cached_live_price()
     day_stats = _cached_day_stats()
+    df = _cached_fetch(timeframe)
 
-    # ── DAX stat bar ─────────────────────────────────────────────────────────
-    if day_stats:
-        price = day_stats.get("price", 0)
-        change = day_stats.get("change", 0)
-        change_pct = day_stats.get("change_pct", 0)
-        color = "#26a69a" if change >= 0 else "#ef5350"
-        arrow = "▲" if change >= 0 else "▼"
+    # Gebruik live prijs als dag-stats verouderd zijn
+    display_price = live_price or (day_stats.get("price") if day_stats else None)
 
-        c1, c2, c3, c4, c5 = st.columns([2, 1, 1, 1, 1])
-        c1.markdown(
-            f"<div style='font-size:28px;font-weight:bold;color:{color};'>"
-            f"DAX {price:,.0f} <span style='font-size:18px;'>{arrow} {change_pct:+.2f}%</span></div>",
+    # ── Header: live prijs + vernieuwen knop ─────────────────────────────────
+    header_left, header_right = st.columns([5, 1])
+    with header_right:
+        if st.button("🔄 Vernieuwen", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
+    with header_left:
+        if display_price and day_stats:
+            change = day_stats.get("change", 0)
+            change_pct = day_stats.get("change_pct", 0)
+            # Herbereken change t.o.v. live prijs als beschikbaar
+            if live_price and day_stats.get("prev_close"):
+                change = live_price - day_stats["prev_close"]
+                change_pct = change / day_stats["prev_close"] * 100
+
+            color = "#26a69a" if change >= 0 else "#ef5350"
+            arrow = "▲" if change >= 0 else "▼"
+
+            # Data freshness indicator
+            freshness_color = "#26a69a" if price_source in ("Yahoo (fast)", "Stooq") else "#ff9800"
+            freshness_label = {
+                "Yahoo (fast)": "~1-2 min vertraging",
+                "Stooq": "~1-5 min vertraging",
+                "Yahoo (1m)": "~5-15 min vertraging",
+            }.get(price_source, "vertraging onbekend")
+
+            st.markdown(
+                f"<div style='display:flex;align-items:baseline;gap:16px;'>"
+                f"<span style='font-size:30px;font-weight:bold;color:{color};'>"
+                f"DAX {display_price:,.1f}</span>"
+                f"<span style='font-size:20px;color:{color};'>{arrow} {change_pct:+.2f}%</span>"
+                f"<span style='font-size:11px;color:{freshness_color};background:rgba(0,0,0,0.3);"
+                f"padding:2px 8px;border-radius:10px;'>📡 {price_source} · {freshness_label}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.markdown(
+            f"<small style='color:#546e7a;'>Bijgewerkt: {datetime.now().strftime('%H:%M:%S')} "
+            f"· Auto-refresh: {REFRESH_SECONDS}s</small>",
             unsafe_allow_html=True,
         )
-        c2.metric("Open", f"{day_stats.get('open', 0):,.0f}")
-        c3.metric("Hoog", f"{day_stats.get('high', 0):,.0f}")
-        c4.metric("Laag", f"{day_stats.get('low', 0):,.0f}")
-        c5.metric(
-            "Vorige sluit",
-            f"{day_stats.get('prev_close', 0):,.0f}" if day_stats.get("prev_close") else "-",
-        )
 
-    st.markdown(
-        f"<small style='color:#546e7a;'>Laatste update: {datetime.now().strftime('%H:%M:%S')}</small>",
-        unsafe_allow_html=True,
-    )
+    # ── Dag statistieken ──────────────────────────────────────────────────────
+    if day_stats:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Open", f"{day_stats.get('open', 0):,.0f}")
+        c2.metric("Hoog", f"{day_stats.get('high', 0):,.0f}")
+        c3.metric("Laag", f"{day_stats.get('low', 0):,.0f}")
+        c4.metric("Vorige sluit", f"{day_stats.get('prev_close', 0):,.0f}" if day_stats.get("prev_close") else "-")
+
     st.divider()
 
     # ── Three-column layout ───────────────────────────────────────────────────
@@ -194,8 +231,7 @@ def live_section():
 
     # ── RIGHT: Calculator ─────────────────────────────────────────────────────
     with right:
-        current_price = day_stats.get("price") if day_stats else None
-        render_calculator(current_price)
+        render_calculator(display_price)
 
 
 # ── Static section: News + Calendar ──────────────────────────────────────────
