@@ -10,6 +10,7 @@ from datetime import datetime
 
 from dashboard.data.market import fetch_dax_ohlcv, get_dax_day_stats, get_current_dax_price
 from dashboard.data.news import fetch_news_items, get_upcoming_events
+from dashboard.data import degiro as degiro_feed
 from dashboard.indicators.signals import compute_signal, compute_mtf_signals, check_confluence
 from dashboard.ui.chart import build_candlestick_chart
 from dashboard.ui.signal_panel import (
@@ -74,28 +75,68 @@ with st.sidebar:
         help="LONG = je verwacht een stijgende DAX. SHORT = dalende DAX.",
     )
 
-    auto_refresh = st.toggle("Auto-refresh (60s)", value=True)
+    auto_refresh = st.toggle("Auto-refresh (15s)", value=True)
     show_ema = st.toggle("EMA lijnen", value=True)
     show_bb = st.toggle("Bollinger Bands", value=True)
 
     st.divider()
+    st.markdown("**📡 DEGIRO Live Feed**")
+
+    dg_status = degiro_feed.get_status()
+    if dg_status["connected"]:
+        st.success("✅ Verbonden — real-time data")
+        if dg_status["last_update"]:
+            st.markdown(
+                f"<small style='color:#7f8c8d;'>Bijgewerkt: {dg_status['last_update'].strftime('%H:%M:%S')}</small>",
+                unsafe_allow_html=True,
+            )
+    elif dg_status["error"] and "inloggegevens" in dg_status["error"]:
+        st.warning("🔑 Geen .env bestand")
+        st.markdown(
+            "<small>Maak `autoresearch/.env` aan met je DEGIRO gebruikersnaam en wachtwoord "
+            "(zie `.env.example`). Herstart de app daarna.</small>",
+            unsafe_allow_html=True,
+        )
+    elif dg_status["error"]:
+        st.error(f"❌ {dg_status['error']}")
+    else:
+        st.info("⏳ Verbinden...")
+
+    st.divider()
     st.markdown(
-        "<small style='color:#7f8c8d;'>Data: Yahoo Finance<br>Vertraging: ~15 min</small>",
+        "<small style='color:#7f8c8d;'>Grafiek data: Yahoo Finance</small>",
         unsafe_allow_html=True,
     )
+
+# ── Start DEGIRO feed once per process ───────────────────────────────────────
+# start_feed() is idempotent — safe to call on every Streamlit rerun.
+# It checks internally whether the thread is already running.
+if "degiro_started" not in st.session_state:
+    st.session_state["degiro_started"] = True
+    degiro_feed.start_feed(extra_isins=["DE000BB3S888"])
 
 # ── Header ───────────────────────────────────────────────────────────────────
 st.markdown(
     "<h1 style='text-align:center;margin-bottom:0;'>📊 DAX Turbo Pro</h1>",
     unsafe_allow_html=True,
 )
-st.markdown(
-    "<div class='disclaimer'>⚠️ Koersen zijn ~15 minuten vertraagd. Niet geschikt voor directe orderuitvoering. "
-    "Dit is geen beleggingsadvies.</div>",
-    unsafe_allow_html=True,
-)
 
-# ── Session state for cached data ────────────────────────────────────────────
+# Show data source disclaimer based on connection status
+_dg = degiro_feed.get_status()
+if _dg["connected"]:
+    st.markdown(
+        "<div class='disclaimer' style='border-color:rgba(38,166,154,0.4);background:rgba(38,166,154,0.08);color:#26a69a;'>"
+        "📡 DEGIRO real-time data actief — koersen bijgewerkt elke ~2 seconden</div>",
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        "<div class='disclaimer'>⚠️ DEGIRO niet verbonden — koersen via Yahoo Finance (~1-5 min vertraging). "
+        "Niet geschikt voor directe orderuitvoering. Dit is geen beleggingsadvies.</div>",
+        unsafe_allow_html=True,
+    )
+
+# ── Session state ─────────────────────────────────────────────────────────────
 if "last_refresh" not in st.session_state:
     st.session_state["last_refresh"] = 0
 if "dax_data_cache" not in st.session_state:
@@ -133,12 +174,17 @@ def _cached_calendar():
 # ── Live data fragment (auto-refreshes every REFRESH_SECONDS) ────────────────
 @st.fragment(run_every=REFRESH_SECONDS if auto_refresh else None)
 def live_section():
-    # Snelste beschikbare prijs (10s cache, meerdere bronnen)
-    live_price, price_source = _cached_live_price()
+    # Prijsprioriteit: 1. DEGIRO (real-time) → 2. Yahoo fast_info (~1min) → 3. dag-stats
+    degiro_price = degiro_feed.get_dax_price()
     day_stats = _cached_day_stats()
     df = _cached_fetch(timeframe)
 
-    # Gebruik live prijs als dag-stats verouderd zijn
+    if degiro_price:
+        live_price = degiro_price
+        price_source = "DEGIRO (real-time)"
+    else:
+        live_price, price_source = _cached_live_price()
+
     display_price = live_price or (day_stats.get("price") if day_stats else None)
 
     # ── Header: live prijs + vernieuwen knop ─────────────────────────────────

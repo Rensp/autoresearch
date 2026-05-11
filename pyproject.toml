@@ -22,6 +22,9 @@ dashboard = [
     "yfinance>=0.2.55",
     "plotly>=5.24.0",
     "feedparser>=6.0.11",
+    "degiro-connector>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "polars>=1.0.0",
 ]
 
 [tool.uv.sources]
