@@ -2,7 +2,12 @@ import sys
 import os
 
 # Ensure project root is on path so `dashboard.*` imports resolve
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _ROOT)
+
+# Load .env with explicit path so env vars are available everywhere
+from dotenv import load_dotenv
+load_dotenv(os.path.join(_ROOT, ".env"), override=False)
 
 import streamlit as st
 import time
