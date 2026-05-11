@@ -47,6 +47,12 @@ Simply spin up your Claude/Codex or whatever you want in this repo (and disable 
 Hi have a look at program.md and let's kick off a new experiment! let's do the setup first.
 ```
 
+Of in het Nederlands:
+
+```
+Hoi, kijk eens naar program.md en laten we een nieuw experiment starten! Laten we eerst de setup doen.
+```
+
 The `program.md` file is essentially a super lightweight "skill".
 
 ## Project structure
