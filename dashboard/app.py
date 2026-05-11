@@ -21,6 +21,7 @@ from dashboard.ui.signal_panel import (
 )
 from dashboard.ui.calculator_panel import render_calculator
 from dashboard.ui.news_panel import render_news_feed, render_economic_calendar
+from dashboard.ui.ai_panel import render_ai_analysis
 
 REFRESH_SECONDS = 15  # 15 seconden voor live prijs; grafiek/signalen via 60s cache
 TIMEFRAMES = ["15m", "1h", "4h", "1d"]
@@ -250,6 +251,10 @@ def live_section():
 
         if df is not None and not df.empty:
             signal = compute_signal(df, direction=direction)
+            # Store for AI panel (session_state survives fragment re-runs)
+            st.session_state["_ai_signal"] = signal
+            st.session_state["_ai_day_stats"] = day_stats
+            st.session_state["_ai_dax_price"] = display_price
             render_signal_badge(signal)
             render_score_gauge(signal.score)
 
@@ -292,6 +297,29 @@ def news_section():
         render_economic_calendar(calendar)
 
 
+# ── AI Advice section ────────────────────────────────────────────────────────
+def ai_section():
+    st.divider()
+    signal = st.session_state.get("_ai_signal")
+    day_stats = st.session_state.get("_ai_day_stats") or {}
+    dax_price = st.session_state.get("_ai_dax_price")
+
+    news = _cached_news()
+    headlines = [item.get("title", "") for item in (news or [])[:8]]
+    calendar = _cached_calendar()
+
+    render_ai_analysis(
+        dax_price=dax_price,
+        signal_score=signal.score if signal else 0.0,
+        signal_label=signal.label if signal else "NEUTRAL",
+        signal_components=signal.components if signal else {},
+        day_stats=day_stats,
+        news_headlines=headlines,
+        calendar_events=calendar or [],
+    )
+
+
 # ── Render ────────────────────────────────────────────────────────────────────
 live_section()
 news_section()
+ai_section()
