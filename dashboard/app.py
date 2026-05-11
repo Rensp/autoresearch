@@ -114,6 +114,15 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
+    st.divider()
+    st.markdown("**🤖 AI Handelsadvies**")
+    import os as _os
+    if not _os.environ.get("ANTHROPIC_API_KEY"):
+        st.caption("Voeg ANTHROPIC_API_KEY toe aan .env")
+    else:
+        if st.button("🔍 Analyseer", type="primary", use_container_width=True):
+            st.session_state["_ai_run"] = True
+
 # ── Start DEGIRO feed once per process ───────────────────────────────────────
 # start_feed() is idempotent — safe to call on every Streamlit rerun.
 # It checks internally whether the thread is already running.
@@ -285,20 +294,9 @@ def live_section():
         )
         st.plotly_chart(fig, width="stretch")
 
-    # ── RIGHT: Calculator + AI ───────────────────────────────────────────────
+    # ── RIGHT: Calculator ─────────────────────────────────────────────────────
     with right:
         render_calculator(display_price)
-        st.divider()
-        signal = st.session_state.get("_ai_signal")
-        render_ai_analysis(
-            dax_price=display_price,
-            signal_score=signal.score if signal else 0.0,
-            signal_label=signal.label if signal else "NEUTRAL",
-            signal_components=signal.components if signal else {},
-            day_stats=day_stats or {},
-            news_headlines=[],
-            calendar_events=[],
-        )
 
 
 # ── Bottom tabs: News / AI ───────────────────────────────────────────────────
@@ -336,3 +334,35 @@ def bottom_section():
 # ── Render ────────────────────────────────────────────────────────────────────
 live_section()
 bottom_section()
+
+# ── AI analyse uitvoer (buiten fragment zodat streaming werkt) ────────────────
+if st.session_state.get("_ai_run"):
+    st.session_state["_ai_run"] = False
+    from dashboard.data.ai_analysis import build_market_context, stream_ai_analysis
+    from dashboard.data.news import fetch_news_items, get_upcoming_events
+
+    _sig = st.session_state.get("_ai_signal")
+    _day = st.session_state.get("_ai_day_stats") or {}
+    _price = st.session_state.get("_ai_dax_price")
+    _news = _cached_news() or []
+    _cal = _cached_calendar() or []
+
+    _ctx = build_market_context(
+        dax_price=_price,
+        signal_score=_sig.score if _sig else 0.0,
+        signal_label=_sig.label if _sig else "NEUTRAL",
+        signal_components=_sig.components if _sig else {},
+        day_stats=_day,
+        news_headlines=[n.get("title", "") for n in _news[:8]],
+        calendar_events=_cal,
+        turbo_info={"str": 25827.2556, "sl": 25568.983},
+    )
+
+    st.markdown("---")
+    st.markdown("### 🤖 AI Handelsadvies")
+    _box = st.empty()
+    _text = ""
+    with st.spinner("Claude analyseert..."):
+        for _chunk in stream_ai_analysis(_ctx):
+            _text += _chunk
+            _box.markdown(_text)
