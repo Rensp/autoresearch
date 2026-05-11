@@ -13,12 +13,24 @@ dependencies = [
     "requests>=2.32.0",
     "rustbpe>=0.1.0",
     "tiktoken>=0.11.0",
-    "torch==2.9.1",
+    "torch==2.9.1; sys_platform == 'linux'",
+]
+
+[project.optional-dependencies]
+dashboard = [
+    "streamlit>=1.40.0",
+    "yfinance>=0.2.55",
+    "plotly>=5.24.0",
+    "feedparser>=6.0.11",
+    "degiro-connector>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "polars>=1.0.0",
+    "anthropic>=0.55.0",
 ]
 
 [tool.uv.sources]
 torch = [
-    { index = "pytorch-cu128" },
+    { index = "pytorch-cu128", marker = "sys_platform == 'linux'" },
 ]
 
 [[tool.uv.index]]
