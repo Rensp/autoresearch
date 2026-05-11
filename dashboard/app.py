@@ -290,41 +290,38 @@ def live_section():
         render_calculator(display_price)
 
 
-# ── Static section: News + Calendar ──────────────────────────────────────────
-def news_section():
+# ── Bottom tabs: News / AI ───────────────────────────────────────────────────
+def bottom_section():
     st.divider()
-    news_col, cal_col = st.columns([1.5, 1])
-    with news_col:
-        news = _cached_news()
-        render_news_feed(news)
-    with cal_col:
-        calendar = _cached_calendar()
-        render_economic_calendar(calendar)
-
-
-# ── AI Advice section ────────────────────────────────────────────────────────
-def ai_section():
-    st.divider()
-    signal = st.session_state.get("_ai_signal")
-    day_stats = st.session_state.get("_ai_day_stats") or {}
-    dax_price = st.session_state.get("_ai_dax_price")
+    tab_news, tab_ai = st.tabs(["📰 Nieuws & Kalender", "🤖 AI Handelsadvies"])
 
     news = _cached_news()
-    headlines = [item.get("title", "") for item in (news or [])[:8]]
     calendar = _cached_calendar()
 
-    render_ai_analysis(
-        dax_price=dax_price,
-        signal_score=signal.score if signal else 0.0,
-        signal_label=signal.label if signal else "NEUTRAL",
-        signal_components=signal.components if signal else {},
-        day_stats=day_stats,
-        news_headlines=headlines,
-        calendar_events=calendar or [],
-    )
+    with tab_news:
+        news_col, cal_col = st.columns([1.5, 1])
+        with news_col:
+            render_news_feed(news)
+        with cal_col:
+            render_economic_calendar(calendar)
+
+    with tab_ai:
+        signal = st.session_state.get("_ai_signal")
+        day_stats = st.session_state.get("_ai_day_stats") or {}
+        dax_price = st.session_state.get("_ai_dax_price")
+        headlines = [item.get("title", "") for item in (news or [])[:8]]
+
+        render_ai_analysis(
+            dax_price=dax_price,
+            signal_score=signal.score if signal else 0.0,
+            signal_label=signal.label if signal else "NEUTRAL",
+            signal_components=signal.components if signal else {},
+            day_stats=day_stats,
+            news_headlines=headlines,
+            calendar_events=calendar or [],
+        )
 
 
 # ── Render ────────────────────────────────────────────────────────────────────
 live_section()
-news_section()
-ai_section()
+bottom_section()
